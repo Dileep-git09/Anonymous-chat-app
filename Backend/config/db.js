@@ -1,23 +1,19 @@
-const mongoose = require("mongoose")
+const dns = require("dns").promises;
+
+const mongoose = require("mongoose");
+
+
+dns.setServers(["1.1.1.1", "1.0.0.1"]);
 
 const connectDB = async () => {
-
     try {
+        const conn = await mongoose.connect(process.env.MONGO_URI);
 
-        const conn = await mongoose.connect(process.env.MONGO_URI, {
-            // userNewUrlParser: true,
-            // useUnifiedTopology: true - -- these options are no longer necessary in mongoose v6 and above
-        });
-
-        console.log(`MongoDB Connected: ${conn.connection.host}`)
-
+        console.log(`MongoDB Connected: ${conn.connection.host}`);
     } catch (error) {
-
-        console.error("MongoDB connection error:", error.message)
-        process.exit(1)
-
+        console.error("MongoDB connection error:", error.message);
+        process.exit(1);
     }
-
 };
 
-module.exports = connectDB
+module.exports = connectDB;

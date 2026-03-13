@@ -1,52 +1,58 @@
+const jwt = require("jsonwebtoken")
 const Message = require("../models/Message")
-const {
-    addUserToQueue,
-    removeUserFromQueue
-} = require("../utils/matchUsers")
+const { addUserToQueue, removeUserFromQueue } = require("../utils/matchUsers")
 
 const socketHandler = (io) => {
 
+    // Authenticate every socket connection using the JWT token
+    io.use((socket, next) => {
+        const token = socket.handshake.auth.token
+
+        if (!token) {
+            return next(new Error("Unauthorized: no token provided"))
+        }
+
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET)
+            socket.userId = decoded.id  // attach userId to socket for later use
+            next()
+        } catch (error) {
+            return next(new Error("Unauthorized: invalid token"))
+        }
+    })
+
     io.on("connection", (socket) => {
 
-        console.log("User connected:", socket.id)
+        console.log(`User connected: ${socket.id} (userId: ${socket.userId})`)
 
         // RANDOM MATCHING
-
         socket.on("findMatch", () => {
 
             const partner = addUserToQueue(socket)
 
             if (!partner) {
-
                 socket.emit("waitingForMatch")
-
             } else {
-
                 const roomId = `${socket.id}-${partner.id}`
 
                 socket.join(roomId)
                 partner.join(roomId)
 
-                io.to(roomId).emit("matchFound", {
-                    roomId
-                })
-
+                io.to(roomId).emit("matchFound", { roomId })
             }
 
         })
 
 
         // SEND MESSAGE
-
         socket.on("sendMessage", async (data) => {
 
-            const { roomId, sender, receiver, message } = data
+            const { roomId, receiver, message } = data
 
             try {
-
                 const newMessage = await Message.create({
-                    sender,
-                    receiver,
+                    sender: socket.userId,   // always use server-verified userId
+                    receiver: receiver || null,
                     roomId,
                     message
                 })
@@ -54,20 +60,17 @@ const socketHandler = (io) => {
                 io.to(roomId).emit("receiveMessage", newMessage)
 
             } catch (error) {
-
-                console.error("Message save error:", error)
-
+                console.error("Message save error:", error.message)
+                socket.emit("messageError", { error: "Failed to send message" })
             }
 
         })
 
 
         // USER DISCONNECT
-
         socket.on("disconnect", () => {
 
-            console.log("User disconnected:", socket.id)
-
+            console.log(`User disconnected: ${socket.id}`)
             removeUserFromQueue(socket.id)
 
         })
@@ -77,6 +80,93 @@ const socketHandler = (io) => {
 }
 
 module.exports = socketHandler
+
+
+
+
+
+
+
+
+// const Message = require("../models/Message")
+// const {
+//     addUserToQueue,
+//     removeUserFromQueue
+// } = require("../utils/matchUsers")
+
+// const socketHandler = (io) => {
+
+//     io.on("connection", (socket) => {
+
+//         console.log("User connected:", socket.id)
+
+//         // RANDOM MATCHING
+
+//         socket.on("findMatch", () => {
+
+//             const partner = addUserToQueue(socket)
+
+//             if (!partner) {
+
+//                 socket.emit("waitingForMatch")
+
+//             } else {
+
+//                 const roomId = `${socket.id}-${partner.id}`
+
+//                 socket.join(roomId)
+//                 partner.join(roomId)
+
+//                 io.to(roomId).emit("matchFound", {
+//                     roomId
+//                 })
+
+//             }
+
+//         })
+
+
+//         // SEND MESSAGE
+
+//         socket.on("sendMessage", async (data) => {
+
+//             const { roomId, sender, receiver, message } = data
+
+//             try {
+
+//                 const newMessage = await Message.create({
+//                     sender,
+//                     receiver,
+//                     roomId,
+//                     message
+//                 })
+
+//                 io.to(roomId).emit("receiveMessage", newMessage)
+
+//             } catch (error) {
+
+//                 console.error("Message save error:", error)
+
+//             }
+
+//         })
+
+
+//         // USER DISCONNECT
+
+//         socket.on("disconnect", () => {
+
+//             console.log("User disconnected:", socket.id)
+
+//             removeUserFromQueue(socket.id)
+
+//         })
+
+//     })
+
+// }
+
+// module.exports = socketHandler
 
 
 
