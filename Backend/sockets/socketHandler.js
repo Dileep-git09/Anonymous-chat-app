@@ -14,7 +14,7 @@ const socketHandler = (io) => {
 
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET)
-            socket.userId = decoded.id  // attach userId to socket for later use
+            socket.userId = decoded.id
             next()
         } catch (error) {
             return next(new Error("Unauthorized: invalid token"))
@@ -38,7 +38,10 @@ const socketHandler = (io) => {
                 socket.join(roomId)
                 partner.join(roomId)
 
-                io.to(roomId).emit("matchFound", { roomId })
+                // Send each user the roomId AND their partner's userId
+                // so the frontend can correctly set receiver when saving messages
+                socket.emit("matchFound", { roomId, partnerId: partner.userId })
+                partner.emit("matchFound", { roomId, partnerId: socket.userId })
             }
 
         })
@@ -51,11 +54,14 @@ const socketHandler = (io) => {
 
             try {
                 const newMessage = await Message.create({
-                    sender: socket.userId,   // always use server-verified userId
+                    sender: socket.userId,
                     receiver: receiver || null,
                     roomId,
                     message
                 })
+
+                // Populate sender username before broadcasting
+                await newMessage.populate("sender", "username")
 
                 io.to(roomId).emit("receiveMessage", newMessage)
 
@@ -80,7 +86,6 @@ const socketHandler = (io) => {
 }
 
 module.exports = socketHandler
-
 
 
 

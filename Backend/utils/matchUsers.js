@@ -2,16 +2,17 @@ let waitingQueue = []
 
 const addUserToQueue = (socket) => {
 
-    if (waitingQueue.length === 0) {
+    // Find a partner who is a different user (prevent self-matching with two tabs)
+    const partnerIndex = waitingQueue.findIndex(
+        (user) => user.userId !== socket.userId
+    )
 
+    if (partnerIndex === -1) {
         waitingQueue.push(socket)
         return null
-
     } else {
-
-        const partner = waitingQueue.shift()
+        const partner = waitingQueue.splice(partnerIndex, 1)[0]
         return partner
-
     }
 
 }

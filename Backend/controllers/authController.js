@@ -81,8 +81,12 @@ exports.loginUser = async (req, res) => {
             maxAge: 24 * 60 * 60 * 1000
         })
 
+        // Token is also returned in the body so the frontend can
+        // pass it to Socket.IO handshake (httpOnly cookies are not
+        // accessible to JavaScript, so socket.io can't read it)
         res.status(200).json({
             message: "Login successful",
+            token,
             user: {
                 id: user._id,
                 username: user.username
